@@ -94,6 +94,12 @@ namespace THEBADDEST.GameDebugSystem
 			var sliderRT = InstantiatePrefab(_activePreset.sliderPrefab, _categoryRoot, $"{_categoryName}_Slider_{label}");
 
 			var slider = sliderRT.GetComponentInChildren<Slider>(true);
+			if (slider == null)
+			{
+				Debug.LogError($"[DebugUIBuilder] Slider prefab is missing a Slider component for '{label}'.");
+				return;
+			}
+
 			slider.minValue = min;
 			slider.maxValue = max;
 			slider.value = Mathf.Clamp(defaultValue, min, max);

@@ -12,9 +12,9 @@ namespace THEBADDEST.GameDebugSystem
 	public sealed class DebugService : ScriptableObject
 	{
 
-		[Header("Wrappers")] [SerializeField] private List<DebugWrapperBase> _wrappers = new List<DebugWrapperBase>();
+		[Header("Wrappers")][SerializeField] private List<DebugWrapperBase> _wrappers = new List<DebugWrapperBase>();
 
-		[Header("UI Presets")] [SerializeField] private DebugUIBuilder.UIPreset _uiPreset = DebugUIBuilder.UIPreset.CreateDefault();
+		[Header("UI Presets")][SerializeField] private DebugUIBuilder.UIPreset _uiPreset = DebugUIBuilder.UIPreset.CreateDefault();
 
 		public DebugUIBuilder.UIPreset UIPreset => _uiPreset;
 
@@ -24,22 +24,15 @@ namespace THEBADDEST.GameDebugSystem
 		public void Init()
 		{
 			// Ensure or create overlay canvas (prefer preset)
-			var canvas = CreateOrGetOverlayCanvas();
+			var canvas = CreateOverlayCanvas();
 			if (canvas == null)
 			{
-				Debug.LogError("[CheatService] Failed to create or locate a Canvas for debug UI.");
+				Debug.LogError("[DebugService] Failed to create or locate a Canvas for debug UI.");
 				return;
 			}
 
-			// Clear previous build if any
-			var existingRoot = canvas.transform.Find("CheatRoot");
-			if (existingRoot != null)
-			{
-				Destroy(existingRoot.gameObject);
-			}
-
 			DebugUIBuilder.ApplyUIPreset(_uiPreset);
-			
+
 			// Categories are created via the builder (which ensures a shared scroll root)
 			foreach (var wrapper in _wrappers)
 			{
@@ -51,26 +44,14 @@ namespace THEBADDEST.GameDebugSystem
 				}
 				catch (Exception ex)
 				{
-					//Debug.LogError($"[CheatService] Error while registering cheats for wrapper: {(wrapper != null ? wrapper.name : \"<null>\")}");
+					Debug.LogError($"[DebugService] Error while registering cheats for wrapper: {(wrapper != null ? wrapper.name : "<null>")}");
 					Debug.LogException(ex);
 				}
 			}
 		}
 
-		private Canvas CreateOrGetOverlayCanvas()
+		private Canvas CreateOverlayCanvas()
 		{
-			// If a CheatCanvas already exists in the scene, reuse it
-			var existingCanvasTransform = GameObject.Find("CheatCanvas")?.transform;
-			if (existingCanvasTransform != null)
-			{
-				var existingCanvas = existingCanvasTransform.GetComponentInParent<Canvas>() ?? existingCanvasTransform.GetComponent<Canvas>();
-				if (existingCanvas != null)
-				{
-					EnsureCanvasDefaults(existingCanvas);
-					return existingCanvas;
-				}
-			}
-
 			// Prefer a preset canvas prefab
 			if (_uiPreset.canvasPrefab != null)
 			{
@@ -81,7 +62,6 @@ namespace THEBADDEST.GameDebugSystem
 				return presetCanvas;
 			}
 
-			// Fallback: create a default overlay canvas
 			var canvasGO = new GameObject("CheatCanvas",
 				typeof(Canvas),
 				typeof(CanvasScaler),
@@ -96,14 +76,14 @@ namespace THEBADDEST.GameDebugSystem
 		{
 			if (canvas == null) return;
 			canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-			if (canvas.sortingOrder < 5000) canvas.sortingOrder = 5000;
+			canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, 5000);
 
 			var scaler = canvas.GetComponent<CanvasScaler>();
 			if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
 			scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
 			scaler.referenceResolution = new Vector2(1920, 1080);
 			scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-			scaler.matchWidthOrHeight = 1f;
+			scaler.matchWidthOrHeight = 0.5f;
 
 			if (canvas.GetComponent<GraphicRaycaster>() == null)
 			{
