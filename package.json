@@ -1,0 +1,20 @@
+{
+	"name": "com.thebaddest.debugservice",
+	"version": "1.0.0",
+	"displayName": "DebugService",
+	"description": "A short description of your package.",
+	"unity": "2020.3",
+	"author": {
+		"name": "Umair Saifullah",
+		"email": "contact@umairsaifullah.com",
+		"url": "https://www.umairsaifullah.com"
+	},
+	"documentationUrl": "",
+	"repository": {
+		"url": "",
+		"type": "git",
+		"revision": ""
+	},
+	"dependencies": {}
+}
+			
