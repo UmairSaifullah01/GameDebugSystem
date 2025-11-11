@@ -27,10 +27,11 @@ namespace THEBADDEST.GameDebugSystem
 				Debug.Log($"[Cheats] Teleport to -> {pos}");
 				// Parse and teleport: var p = Vector3Parser.Parse(pos); Player.Teleport(p);
 			});
-			// builder.AddNumberField("Speed",0,100,1,1, x =>
-			// {
-			// 	Debug.Log($"[Cheats] Teleport to -> {x}");
-			// });
+			builder.AddNumberField("Speed",0,100,1,1, x =>
+			{
+				Debug.Log($"[Cheats] Teleport to -> {x}");
+			});
+			builder.AddToggle("Bool",true, b => { Debug.Log($"Bool Value : {b}");});
 		}
 	}
 }

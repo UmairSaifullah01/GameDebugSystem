@@ -1,7 +1,7 @@
 using System;
+using System.Linq;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
@@ -15,21 +15,28 @@ namespace THEBADDEST.GameDebugSystem
 		[Serializable]
 		public struct UIPreset
 		{
+			public GameObject canvasPrefab;
+			public GameObject categoryPrefab;
 			public GameObject buttonPrefab;
 			public GameObject sliderPrefab;
 			public GameObject inputFieldPrefab;
 			public GameObject numberInputFieldPrefab;
+			public GameObject toggleInputFieldPrefab;
 
 			public static UIPreset CreateDefault() => new UIPreset
 			{
+				canvasPrefab = null,
+				categoryPrefab = null,
 				buttonPrefab = null,
 				sliderPrefab = null,
 				inputFieldPrefab = null,
 				numberInputFieldPrefab = null,
+				toggleInputFieldPrefab = null,
 			};
 		}
 
 		private static UIPreset _activePreset = UIPreset.CreateDefault();
+		public static UIPreset ActivePreset => _activePreset;
 
 		public static void ApplyUIPreset(UIPreset preset)
 		{
@@ -53,26 +60,8 @@ namespace THEBADDEST.GameDebugSystem
 			if (parentCanvas == null) throw new ArgumentNullException(nameof(parentCanvas));
 
 			var container = EnsureRootContainer(parentCanvas);
-			var categoryPanel = CreateUIObject($"{name} Category", container);
-
-			var image = categoryPanel.gameObject.AddComponent<Image>();
-			image.color = new Color(0f, 0f, 0f, 0.5f);
-
-			var layout = categoryPanel.gameObject.AddComponent<VerticalLayoutGroup>();
-			layout.padding = new RectOffset(10, 10, 10, 10);
-			layout.spacing = 6f;
-			layout.childAlignment = TextAnchor.UpperLeft;
-			layout.childControlHeight = true;
-			layout.childControlWidth = true;
-			layout.childForceExpandHeight = false;
-			layout.childForceExpandWidth = true;
-
-			var fitter = categoryPanel.gameObject.AddComponent<ContentSizeFitter>();
-			fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-			fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-			// Header
-			CreateHeader($"{name}", categoryPanel);
+			var categoryPanel = InstantiatePrefab(_activePreset.categoryPrefab, container, $"{name} Category");
+			SetLabelText(categoryPanel, name);
 
 			return new DebugUIBuilder(name, categoryPanel);
 		}
@@ -82,37 +71,19 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddButton(string label, Action onClick)
 		{
-			var row = CreateRow($"{_categoryName}_Button_{label}");
-
-			var buttonRT = InstantiateControl(_activePreset.buttonPrefab, row, "Button");
-			var button = buttonRT.GetComponent<Button>() ?? buttonRT.gameObject.AddComponent<Button>();
-			var image = buttonRT.GetComponent<Image>() ?? buttonRT.gameObject.AddComponent<Image>();
-			if (_activePreset.buttonPrefab == null)
+			var buttonRT = InstantiatePrefab(_activePreset.buttonPrefab, _categoryRoot, $"{_categoryName}_Button_{label}");
+			var button = buttonRT.GetComponentInChildren<Button>(true);
+			if (button == null)
 			{
-				image.color = new Color(1f, 1f, 1f, 0.15f);
+				Debug.LogError($"[DebugUIBuilder] Button prefab is missing a Button component for '{label}'.");
+				return;
 			}
 
+			SetLabelText(buttonRT, label);
 			if (onClick != null)
 			{
 				button.onClick.AddListener(() => onClick());
 			}
-
-			var layoutElem = buttonRT.GetComponent<LayoutElement>() ?? buttonRT.gameObject.AddComponent<LayoutElement>();
-			layoutElem.preferredHeight = Mathf.Max(layoutElem.preferredHeight, 32f);
-
-			var text = buttonRT.GetComponentInChildren<TextMeshProUGUI>();
-			if (text == null)
-			{
-				var textGO = CreateUIObject("Label", buttonRT);
-				text = textGO.gameObject.AddComponent<TextMeshProUGUI>();
-				text.alignment = TextAlignmentOptions.Center;
-				text.color = Color.white;
-				StretchToFill(text.rectTransform);
-			}
-			text.text = label;
-
-			StretchToFill(buttonRT);
-			StretchToFill(row);
 		}
 
 		/// <summary>
@@ -120,85 +91,33 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged)
 		{
-			var row = CreateRow($"{_categoryName}_Slider_{label}");
+			var sliderRT = InstantiatePrefab(_activePreset.sliderPrefab, _categoryRoot, $"{_categoryName}_Slider_{label}");
 
-			// Label
-			var labelGO = CreateUIObject("Label", row);
-			var labelText = labelGO.gameObject.AddComponent<TextMeshProUGUI>();
-			labelText.text = label;
-			labelText.alignment = TextAlignmentOptions.MidlineLeft;
-			labelText.color = Color.white;
-			var labelLE = labelGO.gameObject.GetComponent<LayoutElement>() ?? labelGO.gameObject.AddComponent<LayoutElement>();
-			labelLE.minWidth = 100f;
-			labelLE.preferredHeight = 28f;
-
-			// Slider
-			var sliderRT = InstantiateControl(_activePreset.sliderPrefab, row, "Slider");
-			var sliderBg = sliderRT.GetComponent<Image>() ?? sliderRT.gameObject.AddComponent<Image>();
-			if (_activePreset.sliderPrefab == null)
-			{
-				sliderBg.color = new Color(1f, 1f, 1f, 0.08f);
-			}
-
-			var slider = sliderRT.GetComponent<Slider>() ?? sliderRT.gameObject.AddComponent<Slider>();
+			var slider = sliderRT.GetComponentInChildren<Slider>(true);
 			slider.minValue = min;
 			slider.maxValue = max;
 			slider.value = Mathf.Clamp(defaultValue, min, max);
 
-			if (slider.fillRect == null)
+			SetLabelText(sliderRT, label);
+
+			var valueText = FindText(sliderRT, "Value");
+			if (valueText != null)
 			{
-				var fillArea = CreateUIObject("Fill Area", sliderRT);
-				fillArea.anchorMin = new Vector2(0f, 0.25f);
-				fillArea.anchorMax = new Vector2(1f, 0.75f);
-				fillArea.offsetMin = new Vector2(10f, 0f);
-				fillArea.offsetMax = new Vector2(-40f, 0f);
-
-				var fill = CreateUIObject("Fill", fillArea);
-				var fillImg = fill.gameObject.AddComponent<Image>();
-				fillImg.color = new Color(0.3f, 0.7f, 1f, 0.8f);
-				slider.fillRect = fill;
-
-				var handleSlideArea = CreateUIObject("Handle Slide Area", sliderRT);
-				handleSlideArea.anchorMin = new Vector2(0f, 0f);
-				handleSlideArea.anchorMax = new Vector2(1f, 1f);
-				handleSlideArea.offsetMin = new Vector2(10f, 0f);
-				handleSlideArea.offsetMax = new Vector2(-10f, 0f);
-
-				var handle = CreateUIObject("Handle", handleSlideArea);
-				var handleImg = handle.gameObject.AddComponent<Image>();
-				handleImg.color = new Color(1f, 1f, 1f, 0.9f);
-				slider.targetGraphic = handleImg;
-				slider.handleRect = handle;
+				valueText.text = slider.value.ToString("0.##");
 			}
-
-			var sliderLE = sliderRT.GetComponent<LayoutElement>() ?? sliderRT.gameObject.AddComponent<LayoutElement>();
-			sliderLE.flexibleWidth = 1f;
-			sliderLE.preferredHeight = Mathf.Max(sliderLE.preferredHeight, 28f);
-
-			// Value text
-			var valueGO = CreateUIObject("Value", row);
-			var valueText = valueGO.gameObject.AddComponent<TextMeshProUGUI>();
-			valueText.text = slider.value.ToString("0.##");
-			valueText.alignment = TextAlignmentOptions.MidlineRight;
-			valueText.color = Color.white;
-			var valueLE = valueGO.gameObject.GetComponent<LayoutElement>() ?? valueGO.gameObject.AddComponent<LayoutElement>();
-			valueLE.minWidth = 60f;
-			valueLE.preferredHeight = 28f;
 
 			if (onChanged != null)
 			{
 				slider.onValueChanged.AddListener(v =>
 				{
-					valueText.text = v.ToString("0.##");
+					if (valueText != null) valueText.text = v.ToString("0.##");
 					onChanged(v);
 				});
 			}
-			else
+			else if (valueText != null)
 			{
 				slider.onValueChanged.AddListener(v => valueText.text = v.ToString("0.##"));
 			}
-
-			StretchToFill(row);
 		}
 
 		/// <summary>
@@ -206,420 +125,165 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddInputField(string label, string placeholder, Action<string> onSubmit)
 		{
-			var row = CreateRow($"{_categoryName}_Input_{label}");
+			var inputRT = InstantiatePrefab(_activePreset.inputFieldPrefab, _categoryRoot, $"{_categoryName}_Input_{label}");
+			SetLabelText(inputRT, label);
 
-			// Label
-			var labelGO = CreateUIObject("Label", row);
-			var labelText = labelGO.gameObject.AddComponent<TextMeshProUGUI>();
-			labelText.text = label;
-			labelText.alignment = TextAlignmentOptions.MidlineLeft;
-			labelText.color = Color.white;
-			var labelLE = labelGO.gameObject.GetComponent<LayoutElement>() ?? labelGO.gameObject.AddComponent<LayoutElement>();
-			labelLE.minWidth = 100f;
-			labelLE.preferredHeight = 28f;
-
-			// Input Field container
-			var inputRT = InstantiateControl(_activePreset.inputFieldPrefab, row, "InputField");
-			var bg = inputRT.GetComponent<Image>() ?? inputRT.gameObject.AddComponent<Image>();
-			if (_activePreset.inputFieldPrefab == null)
+			var input = inputRT.GetComponentInChildren<TMP_InputField>(true);
+			if (input == null)
 			{
-				bg.color = new Color(1f, 1f, 1f, 0.1f);
-			}
-
-			var input = inputRT.GetComponent<TMP_InputField>() ?? inputRT.gameObject.AddComponent<TMP_InputField>();
-
-			if (input.textComponent == null)
-			{
-				var textGO = CreateUIObject("Text", inputRT);
-				var text = textGO.gameObject.AddComponent<TextMeshProUGUI>();
-				text.color = Color.white;
-				text.alignment = TextAlignmentOptions.MidlineLeft;
-				input.textComponent = text;
-				StretchToFill(text.rectTransform);
-			}
-
-			if (input.placeholder == null)
-			{
-				var placeholderGO = CreateUIObject("Placeholder", inputRT);
-				var placeholderText = placeholderGO.gameObject.AddComponent<TextMeshProUGUI>();
-				placeholderText.text = string.IsNullOrEmpty(placeholder) ? "Enter value..." : placeholder;
-				placeholderText.color = new Color(1f, 1f, 1f, 0.5f);
-				placeholderText.alignment = TextAlignmentOptions.MidlineLeft;
-				input.placeholder = placeholderText;
-				StretchToFill(placeholderText.rectTransform);
-			}
-			else if (!string.IsNullOrEmpty(placeholder))
-			{
-				switch (input.placeholder)
-				{
-					case TextMeshProUGUI tmpPlaceholder:
-						tmpPlaceholder.text = placeholder;
-						break;
-					case TMP_Text tmpText:
-						tmpText.text = placeholder;
-						break;
-				}
+				Debug.LogError($"[DebugUIBuilder] Input prefab is missing a TMP_InputField component for '{label}'.");
+				return;
 			}
 
 			input.lineType = TMP_InputField.LineType.SingleLine;
 
-			var inputLE = inputRT.GetComponent<LayoutElement>() ?? inputRT.gameObject.AddComponent<LayoutElement>();
-			inputLE.flexibleWidth = 1f;
-			inputLE.preferredHeight = Mathf.Max(inputLE.preferredHeight, 28f);
+			var placeholderText = input.placeholder as TMP_Text;
+			if (placeholderText != null && !string.IsNullOrEmpty(placeholder))
+			{
+				placeholderText.text = placeholder;
+			}
 
 			if (onSubmit != null)
 			{
 				input.onSubmit.AddListener(onSubmit.Invoke);
 			}
 
-			StretchToFill(row);
+			if (onSubmit == null && !string.IsNullOrEmpty(placeholder))
+			{
+				// keep placeholder consistent without listeners
+				input.onEndEdit.AddListener(_ => { });
+			}
 		}
 
 		/// <summary>
-		/// Adds a numeric input with '<' and '>' buttons to decrement/increment.
+		/// Adds a numeric input with optional '<' and '>' buttons to decrement/increment.
+		/// Uses NumberInput prefab exclusively.
 		/// </summary>
-		// public void AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged)
-		// {
-		// 	var row = CreateRow($"{_categoryName}_Number_{label}");
-		//
-		// 	// Label
-		// 	var labelGO = CreateUIObject("Label", row);
-		// 	var labelText = labelGO.gameObject.AddComponent<TextMeshProUGUI>();
-		// 	labelText.text = label;
-		// 	labelText.alignment = TextAlignmentOptions.MidlineLeft;
-		// 	labelText.color = Color.white;
-		// 	var labelLE = labelGO.gameObject.GetComponent<LayoutElement>() ?? labelGO.gameObject.AddComponent<LayoutElement>();
-		// 	labelLE.minWidth = 100f;
-		// 	labelLE.preferredHeight = 28f;
-		//
-		// 	// State and updater
-		// 	float current = Mathf.Clamp(defaultValue, min, max);
-		// 	Action<TMP_InputField, float, bool> UpdateDisplay = (field, v, notify) =>
-		// 	{
-		// 		var clamped = Mathf.Clamp(v, min, max);
-		// 		current = clamped;
-		// 		if (notify && onChanged != null) onChanged(clamped);
-		// 		if (field != null) field.SetTextWithoutNotify(clamped.ToString("0.##"));
-		// 	};
-		//
-		// 	// If a composite number field prefab is provided, use it directly
-		// 	if (_activePreset.numberFieldPrefab != null)
-		// 	{
-		// 		var composite = InstantiateControl(_activePreset.numberFieldPrefab, row, "NumberField");
-		// 		var compositeLE = composite.GetComponent<LayoutElement>() ?? composite.gameObject.AddComponent<LayoutElement>();
-		// 		compositeLE.flexibleWidth = 1f;
-		// 		compositeLE.preferredHeight = Mathf.Max(compositeLE.preferredHeight, 28f);
-		//
-		// 		var compositeInput = composite.GetComponentInChildren<TMP_InputField>(true);
-		// 		Button compositeDecBtn = null;
-		// 		Button compositeIncBtn = null;
-		//
-		// 		// Try to find buttons by common names/text markers
-		// 		var buttons = composite.GetComponentsInChildren<Button>(true);
-		// 		foreach (var b in buttons)
-		// 		{
-		// 			if (compositeDecBtn == null)
-		// 			{
-		// 				if (b.name.IndexOf("dec", StringComparison.OrdinalIgnoreCase) >= 0 ||
-		// 				    b.name.IndexOf("minus", StringComparison.OrdinalIgnoreCase) >= 0)
-		// 				{
-		// 					compositeDecBtn = b;
-		// 				}
-		// 				else
-		// 				{
-		// 					var t = b.GetComponentInChildren<TextMeshProUGUI>();
-		// 					if (t != null && t.text.Trim() == "<") compositeDecBtn = b;
-		// 				}
-		// 			}
-		// 			if (compositeIncBtn == null)
-		// 			{
-		// 				if (b.name.IndexOf("inc", StringComparison.OrdinalIgnoreCase) >= 0 ||
-		// 				    b.name.IndexOf("plus", StringComparison.OrdinalIgnoreCase) >= 0)
-		// 				{
-		// 					compositeIncBtn = b;
-		// 				}
-		// 				else
-		// 				{
-		// 					var t = b.GetComponentInChildren<TextMeshProUGUI>();
-		// 					if (t != null && t.text.Trim() == ">") compositeIncBtn = b;
-		// 				}
-		// 			}
-		// 		}
-		//
-		// 		// Fallback: if still missing, try assign by order
-		// 		if (buttons != null && buttons.Length > 0)
-		// 		{
-		// 			if (compositeDecBtn == null) compositeDecBtn = buttons[0];
-		// 			if (compositeIncBtn == null && buttons.Length > 1) compositeIncBtn = buttons[1];
-		// 		}
-		//
-		// 		// Ensure input field exists in composite, otherwise create a simple one
-		// 		if (compositeInput == null)
-		// 		{
-		// 			var compositeInputRT = InstantiateControl(_activePreset.inputFieldPrefab, composite, "InputField");
-		// 			var compositeInputBg = compositeInputRT.GetComponent<Image>() ?? compositeInputRT.gameObject.AddComponent<Image>();
-		// 			if (_activePreset.inputFieldPrefab == null)
-		// 			{
-		// 				compositeInputBg.color = new Color(1f, 1f, 1f, 0.1f);
-		// 			}
-		// 			compositeInput = compositeInputRT.GetComponent<TMP_InputField>() ?? compositeInputRT.gameObject.AddComponent<TMP_InputField>();
-		// 			if (compositeInput.textComponent == null)
-		// 			{
-		// 				var textGO = CreateUIObject("Text", compositeInputRT);
-		// 				var text = textGO.gameObject.AddComponent<TextMeshProUGUI>();
-		// 				text.color = Color.white;
-		// 				text.alignment = TextAlignmentOptions.Center;
-		// 				compositeInput.textComponent = text;
-		// 				StretchToFill(text.rectTransform);
-		// 			}
-		// 			compositeInput.contentType = TMP_InputField.ContentType.DecimalNumber;
-		// 			compositeInput.lineType = TMP_InputField.LineType.SingleLine;
-		// 		}
-		//
-		// 		UpdateDisplay(compositeInput, current, false);
-		//
-		// 		if (compositeDecBtn != null) compositeDecBtn.onClick.AddListener(() => UpdateDisplay(compositeInput, current - Mathf.Abs(step), true));
-		// 		if (compositeIncBtn != null) compositeIncBtn.onClick.AddListener(() => UpdateDisplay(compositeInput, current + Mathf.Abs(step), true));
-		// 		if (compositeInput != null)
-		// 		{
-		// 			compositeInput.onEndEdit.AddListener(str =>
-		// 			{
-		// 				if (float.TryParse(str, out var parsed))
-		// 				{
-		// 					UpdateDisplay(compositeInput, parsed, true);
-		// 				}
-		// 				else
-		// 				{
-		// 					UpdateDisplay(compositeInput, current, false);
-		// 				}
-		// 			});
-		// 		}
-		//
-		// 		StretchToFill(row);
-		// 		return;
-		// 	}
-		//
-		// 	// Decrement Button
-		// 	var decPrefab = _activePreset.decrementButtonPrefab != null
-		// 		? _activePreset.decrementButtonPrefab
-		// 		: _activePreset.buttonPrefab;
-		// 	var decRT = InstantiateControl(decPrefab, row, "Dec");
-		// 	var decBtn = decRT.GetComponent<Button>() ?? decRT.gameObject.AddComponent<Button>();
-		// 	var decImg = decRT.GetComponent<Image>() ?? decRT.gameObject.AddComponent<Image>();
-		// 	if (decPrefab == null)
-		// 	{
-		// 		decImg.color = new Color(1f, 1f, 1f, 0.15f);
-		// 	}
-		// 	var decText = decRT.GetComponentInChildren<TextMeshProUGUI>();
-		// 	if (decText == null)
-		// 	{
-		// 		var t = CreateUIObject("Label", decRT);
-		// 		decText = t.gameObject.AddComponent<TextMeshProUGUI>();
-		// 		decText.alignment = TextAlignmentOptions.Center;
-		// 		decText.color = Color.white;
-		// 		StretchToFill(decText.rectTransform);
-		// 	}
-		// 	decText.text = "<";
-		// 	var decLE = decRT.GetComponent<LayoutElement>() ?? decRT.gameObject.AddComponent<LayoutElement>();
-		// 	decLE.minWidth = 32f;
-		// 	decLE.preferredHeight = Mathf.Max(decLE.preferredHeight, 28f);
-		//
-		// 	// Input
-		// 	var numberInputPrefab = _activePreset.numberInputFieldPrefab != null
-		// 		? _activePreset.numberInputFieldPrefab
-		// 		: _activePreset.inputFieldPrefab;
-		// 	var inputRT = InstantiateControl(numberInputPrefab, row, "InputField");
-		// 	var inputBg = inputRT.GetComponent<Image>() ?? inputRT.gameObject.AddComponent<Image>();
-		// 	if (numberInputPrefab == null)
-		// 	{
-		// 		inputBg.color = new Color(1f, 1f, 1f, 0.1f);
-		// 	}
-		// 	var input = inputRT.GetComponent<TMP_InputField>() ?? inputRT.gameObject.AddComponent<TMP_InputField>();
-		// 	if (input.textComponent == null)
-		// 	{
-		// 		var textGO = CreateUIObject("Text", inputRT);
-		// 		var text = textGO.gameObject.AddComponent<TextMeshProUGUI>();
-		// 		text.color = Color.white;
-		// 		text.alignment = TextAlignmentOptions.Center;
-		// 		input.textComponent = text;
-		// 		StretchToFill(text.rectTransform);
-		// 	}
-		// 	input.contentType = TMP_InputField.ContentType.DecimalNumber;
-		// 	input.lineType = TMP_InputField.LineType.SingleLine;
-		// 	var inputLE = inputRT.GetComponent<LayoutElement>() ?? inputRT.gameObject.AddComponent<LayoutElement>();
-		// 	inputLE.flexibleWidth = 1f;
-		// 	inputLE.preferredHeight = Mathf.Max(inputLE.preferredHeight, 28f);
-		//
-		// 	// Increment Button
-		// 	var incPrefab = _activePreset.incrementButtonPrefab != null
-		// 		? _activePreset.incrementButtonPrefab
-		// 		: _activePreset.buttonPrefab;
-		// 	var incRT = InstantiateControl(incPrefab, row, "Inc");
-		// 	var incBtn = incRT.GetComponent<Button>() ?? incRT.gameObject.AddComponent<Button>();
-		// 	var incImg = incRT.GetComponent<Image>() ?? incRT.gameObject.AddComponent<Image>();
-		// 	if (incPrefab == null)
-		// 	{
-		// 		incImg.color = new Color(1f, 1f, 1f, 0.15f);
-		// 	}
-		// 	var incText = incRT.GetComponentInChildren<TextMeshProUGUI>();
-		// 	if (incText == null)
-		// 	{
-		// 		var t = CreateUIObject("Label", incRT);
-		// 		incText = t.gameObject.AddComponent<TextMeshProUGUI>();
-		// 		incText.alignment = TextAlignmentOptions.Center;
-		// 		incText.color = Color.white;
-		// 		StretchToFill(incText.rectTransform);
-		// 	}
-		// 	incText.text = ">";
-		// 	var incLE = incRT.GetComponent<LayoutElement>() ?? incRT.gameObject.AddComponent<LayoutElement>();
-		// 	incLE.minWidth = 32f;
-		// 	incLE.preferredHeight = Mathf.Max(incLE.preferredHeight, 28f);
-		//
-		// 	UpdateDisplay(input, current, false);
-		//
-		// 	decBtn.onClick.AddListener(() => UpdateDisplay(input, current - Mathf.Abs(step), true));
-		// 	incBtn.onClick.AddListener(() => UpdateDisplay(input, current + Mathf.Abs(step), true));
-		// 	input.onEndEdit.AddListener(str =>
-		// 	{
-		// 		if (float.TryParse(str, out var parsed))
-		// 		{
-		// 			UpdateDisplay(input, parsed, true);
-		// 		}
-		// 		else
-		// 		{
-		// 			UpdateDisplay(input, current, false);
-		// 		}
-		// 	});
-		//
-		// 	StretchToFill(row);
-		// }
+		public void AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged)
+		{
+			var numberRT = InstantiatePrefab(_activePreset.numberInputFieldPrefab, _categoryRoot, $"{_categoryName}_Number_{label}");
+			SetLabelText(numberRT, label);
+
+			var input = numberRT.GetComponentInChildren<TMP_InputField>(true);
+			if (input == null)
+			{
+				Debug.LogError($"[DebugUIBuilder] Number input prefab is missing a TMP_InputField for '{label}'.");
+				return;
+			}
+
+			float current = Mathf.Clamp(defaultValue, min, max);
+			Action<TMP_InputField, float, bool> UpdateDisplay = (field, v, notify) =>
+			{
+				var clamped = Mathf.Clamp(v, min, max);
+				current = clamped;
+				if (notify && onChanged != null) onChanged(clamped);
+				if (field != null) field.SetTextWithoutNotify(clamped.ToString("0.##"));
+			};
+
+			UpdateDisplay(input, current, false);
+
+			var buttons = numberRT.GetComponentsInChildren<Button>(true);
+			if (buttons != null)
+			{
+				foreach (var button in buttons)
+				{
+					if (button == null) continue;
+					var nameLower = button.name.ToLowerInvariant();
+					if (nameLower.Contains("left") || nameLower.Contains("dec") || nameLower.Contains("minus"))
+					{
+						button.onClick.AddListener(() => UpdateDisplay(input, current - Mathf.Abs(step), true));
+					}
+					else if (nameLower.Contains("right") || nameLower.Contains("inc") || nameLower.Contains("plus"))
+					{
+						button.onClick.AddListener(() => UpdateDisplay(input, current + Mathf.Abs(step), true));
+					}
+				}
+			}
+
+			input.onEndEdit.AddListener(str =>
+			{
+				if (float.TryParse(str, out var parsed))
+				{
+					UpdateDisplay(input, parsed, true);
+				}
+				else
+				{
+					UpdateDisplay(input, current, false);
+				}
+			});
+		}
+
+		/// <summary>
+		/// Adds a toggle with label and value changed callback.
+		/// </summary>
+		public void AddToggle(string label, bool defaultValue, Action<bool> onChanged)
+		{
+			var toggleRT = InstantiatePrefab(_activePreset.toggleInputFieldPrefab, _categoryRoot, $"{_categoryName}_Toggle_{label}");
+			SetLabelText(toggleRT, label);
+
+			var toggle = toggleRT.GetComponentInChildren<Toggle>(true);
+			if (toggle == null)
+			{
+				Debug.LogError($"[DebugUIBuilder] Toggle prefab is missing a Toggle component for '{label}'.");
+				return;
+			}
+			toggle.isOn = defaultValue;
+
+			if (onChanged != null)
+			{
+				toggle.onValueChanged.AddListener(onChanged.Invoke);
+			}
+		}
 
 		// Helpers
 		private static RectTransform EnsureRootContainer(Canvas canvas)
 		{
-			// Root parent under canvas for all cheats (with ScrollRect)
-			var existing = canvas.transform.Find("CheatRoot") as RectTransform;
-			if (existing != null) return existing;
+			// Expect a prefab-created hierarchy: Root/ScrollView/Viewport/Content
+			var root = canvas.transform.Find("Root/ScrollView/Viewport/Content") as RectTransform;
+			if (root != null) return root;
 
-			// Ensure EventSystem exists
-			EnsureEventSystem();
+			// Fallback: attempt to use Root directly
+			root = canvas.transform.Find("Root") as RectTransform;
+			if (root != null) return root;
 
-			// Root object
-			var root = CreateUIObject("CheatRoot", canvas.transform as RectTransform);
-			var rootRT = root;
-			StretchToFill(rootRT);
-
-			// ScrollView
-			var scrollView = CreateUIObject("ScrollView", rootRT);
-			var scrollRect = scrollView.gameObject.AddComponent<ScrollRect>();
-			var scrollImage = scrollView.gameObject.AddComponent<Image>();
-			scrollImage.color = new Color(0f, 0f, 0f, 0.25f);
-
-			// Viewport
-			var viewport = CreateUIObject("Viewport", scrollView);
-			var maskImage = viewport.gameObject.AddComponent<Image>();
-			maskImage.color = new Color(0f, 0f, 0f, 0.01f);
-			viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-
-			// Content
-			var content = CreateUIObject("Content", viewport);
-			var vlg = content.gameObject.AddComponent<VerticalLayoutGroup>();
-			vlg.padding = new RectOffset(12, 12, 12, 12);
-			vlg.spacing = 12f;
-			vlg.childControlWidth = true;
-			vlg.childControlHeight = true;
-			vlg.childForceExpandHeight = false;
-			vlg.childForceExpandWidth = true;
-
-			var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
-			fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-			StretchToFill(scrollView);
-			StretchToFill(viewport);
-			scrollRect.viewport = viewport;
-			scrollRect.content = content;
-			scrollRect.horizontal = false;
-
-			return content;
+			Debug.LogError("[DebugUIBuilder] Could not locate the preset Content container. Ensure the canvas prefab contains 'Root/ScrollView/Viewport/Content'.");
+			throw new InvalidOperationException("Missing preset content root.");
 		}
 
-		private static void EnsureEventSystem()
+		private static RectTransform InstantiatePrefab(GameObject prefab, RectTransform parent, string name)
 		{
-			if (EventSystem.current != null) return;
-			new GameObject("EventSystem",
-				typeof(EventSystem),
-				typeof(StandaloneInputModule));
-		}
-
-		private static RectTransform CreateHeader(string title, RectTransform parent)
-		{
-			var header = CreateUIObject("Header", parent);
-			var text = header.gameObject.AddComponent<TextMeshProUGUI>();
-			text.text = title;
-			text.fontSize = 18;
-			text.alignment = TextAlignmentOptions.MidlineLeft;
-			text.color = Color.yellow;
-			var le = header.gameObject.AddComponent<LayoutElement>();
-			le.preferredHeight = 28f;
-			StretchToFill(header);
-			return header;
-		}
-
-		private RectTransform CreateRow(string name)
-		{
-			var row = CreateUIObject(name, _categoryRoot);
-			var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-			layout.spacing = 6f;
-			layout.childAlignment = TextAnchor.MiddleLeft;
-			layout.childControlHeight = true;
-			layout.childControlWidth = true;
-			layout.childForceExpandHeight = false;
-			layout.childForceExpandWidth = true;
-			var le = row.gameObject.AddComponent<LayoutElement>();
-			le.minHeight = 28f;
-			return row;
-		}
-
-		private static RectTransform InstantiateControl(GameObject prefab, RectTransform parent, string name)
-		{
-			if (prefab != null)
+			if (prefab == null)
 			{
-				var instance = Object.Instantiate(prefab, parent);
-				instance.name = name;
-				var rt = instance.transform as RectTransform;
-				if (rt == null)
-				{
-					rt = instance.AddComponent<RectTransform>();
-				}
-				rt.SetParent(parent, false);
-				return rt;
+				Debug.LogError($"[DebugUIBuilder] Missing prefab for '{name}'. Please assign it in the UIPreset.");
+				throw new InvalidOperationException($"Missing prefab for {name}");
 			}
 
-			return CreateUIObject(name, parent);
-		}
-
-		private static RectTransform CreateUIObject(string name, RectTransform parent)
-		{
-			var go = new GameObject(name, typeof(RectTransform));
-			var rt = go.GetComponent<RectTransform>();
+			var instance = Object.Instantiate(prefab, parent);
+			instance.name = name;
+			var rt = instance.transform as RectTransform;
+			if (rt == null)
+			{
+				rt = instance.AddComponent<RectTransform>();
+			}
 			rt.SetParent(parent, false);
-			rt.localScale = Vector3.one;
-			rt.localPosition = Vector3.zero;
-			rt.localRotation = Quaternion.identity;
-			rt.anchorMin = new Vector2(0f, 1f);
-			rt.anchorMax = new Vector2(1f, 1f);
-			rt.pivot = new Vector2(0.5f, 1f);
-			rt.sizeDelta = new Vector2(0f, 0f);
 			return rt;
 		}
 
-		private static void StretchToFill(RectTransform rt)
+		private static void SetLabelText(RectTransform root, string text)
 		{
-			rt.anchorMin = new Vector2(0f, 0f);
-			rt.anchorMax = new Vector2(1f, 1f);
-			rt.pivot = new Vector2(0.5f, 0.5f);
-			rt.offsetMin = Vector2.zero;
-			rt.offsetMax = Vector2.zero;
+			if (root == null) return;
+			var label = FindText(root, "Label") ?? root.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
+			if (label != null)
+			{
+				label.text = text;
+			}
+		}
+
+		private static TextMeshProUGUI FindText(RectTransform root, string nameContains)
+		{
+			if (root == null) return null;
+			var texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+			return texts.FirstOrDefault(t => t.name.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0);
 		}
 	}
 }

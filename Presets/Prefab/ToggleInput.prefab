@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 6773912382602916393}
   - component: {fileID: 1388733337339992376}
   m_Layer: 0
-  m_Name: Toggles
+  m_Name: Toggle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -61,11 +61,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_IgnoreLayout: 0
-  m_MinWidth: -1
+  m_MinWidth: 60
   m_MinHeight: 33.25
   m_PreferredWidth: -1
   m_PreferredHeight: -1
-  m_FlexibleWidth: -1
+  m_FlexibleWidth: 40
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
 --- !u!114 &1388733337339992376
@@ -231,7 +231,7 @@ GameObject:
   - component: {fileID: 8110952391728204910}
   - component: {fileID: 6272095365975459074}
   m_Layer: 0
-  m_Name: ToggleOff
+  m_Name: Off
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -322,7 +322,7 @@ GameObject:
   - component: {fileID: 3088089528573353687}
   - component: {fileID: 6680686855295736}
   m_Layer: 0
-  m_Name: ToggleOn
+  m_Name: On
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
