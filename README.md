@@ -1,5 +1,7 @@
 # Game Debug System
 
+**Version 1.0.1**
+
 A flexible Unity debug and cheat system that provides a customizable UI builder for creating debug panels with buttons, sliders, input fields, number fields, and toggles. Organize debug controls into categories using ScriptableObject-based wrappers.
 
 ## Features
@@ -9,6 +11,9 @@ A flexible Unity debug and cheat system that provides a customizable UI builder 
 - **ScriptableObject-based**: Use ScriptableObjects for easy configuration and asset management
 - **Prefab Support**: Assign custom UI prefabs for complete visual customization
 - **Auto Canvas Creation**: Automatically creates and configures overlay canvases for debug UI
+- **Show/Hide Functionality**: Toggle debug UI visibility programmatically or via triggers
+- **Multiple Trigger Options**: Choose between UI Button, Corner Tap, or None for showing/hiding the debug UI
+- **Value Synchronization**: Getter functions to sync UI controls with current game state values
 - **Error Handling**: Robust error handling with detailed logging
 
 ## Requirements
@@ -38,12 +43,16 @@ Create ScriptableObject wrappers that define your debug controls:
 2. Select `Create > Cheats > Gameplay Wrapper` (or create a custom wrapper)
 3. Implement the `RegisterCheats` method to add your debug controls
 
-### 3. Configure UI Presets
+### 3. Configure UI Presets and Trigger Options
 
 In your `DebugService` asset:
 
 - Assign UI prefabs (Canvas, Category, Button, Slider, Input, NumberInput, ToggleInput)
 - Add your debug wrappers to the Wrappers list
+- Configure trigger options:
+  - **Hide At Start**: Hide the debug UI when initialized
+  - **Trigger Type**: Choose how to show/hide the UI (UIButton, CornerTap, or None)
+  - **Corner Tap Settings**: Configure corner tap detection (tap count, timeout, area size) when CornerTap is selected
 
 ### 4. Initialize the Debug Service
 
@@ -109,12 +118,12 @@ namespace THEBADDEST.GameDebugSystem
                 // GameSystems.Inventory.AddGold(100);
             });
 
-            // Example slider
+            // Example slider with getter to sync with current value
             builder.AddSlider("Player Speed", 1f, 10f, 3f, (v) =>
             {
                 Debug.Log($"[Cheats] Player speed -> {v:0.##}");
                 // PlayerController.Instance.SetSpeed(v);
-            });
+            }, () => PlayerController.Instance.GetSpeed()); // Getter to sync with current value
 
             // Example input field
             builder.AddInputField("Teleport To", "x,y,z", (pos) =>
@@ -129,11 +138,12 @@ namespace THEBADDEST.GameDebugSystem
                 Debug.Log($"[Cheats] Speed -> {x}");
             });
 
-            // Example toggle
-            builder.AddToggle("Bool", true, b =>
+            // Example toggle with getter to sync with current value
+            builder.AddToggle("God Mode", false, (b) =>
             {
-                Debug.Log($"Bool Value : {b}");
-            });
+                Debug.Log($"God Mode : {b}");
+                // PlayerController.Instance.SetGodMode(b);
+            }, () => PlayerController.Instance.IsGodModeActive()); // Getter to sync with current value
         }
     }
 }
@@ -148,10 +158,14 @@ The main service that manages debug UI creation and initialization.
 #### Methods
 
 - `Init()`: Builds or rebuilds the debug UI on a canvas
+- `Show()`: Shows the debug UI
+- `Hide()`: Hides the debug UI
+- `ToggleVisibility()`: Toggles the visibility of the debug UI
 
 #### Properties
 
 - `UIPreset`: Gets the current UI preset configuration
+- `IsVisible`: Gets whether the debug UI is currently visible
 
 ### DebugUIBuilder
 
@@ -165,10 +179,10 @@ Builder class for creating debug UI controls.
 #### Instance Methods
 
 - `AddButton(string label, Action onClick)`: Adds a button with a label and click callback
-- `AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged)`: Adds a slider with label and value changed callback
-- `AddInputField(string label, string placeholder, Action<string> onSubmit)`: Adds an input field with label, placeholder, and submit callback
-- `AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged)`: Adds a numeric input with increment/decrement buttons
-- `AddToggle(string label, bool defaultValue, Action<bool> onChanged)`: Adds a toggle with label and value changed callback
+- `AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged, Func<float> getter = null)`: Adds a slider with label and value changed callback. Optional getter to sync with current value.
+- `AddInputField(string label, string placeholder, Action<string> onSubmit, Func<string> getter = null)`: Adds an input field with label, placeholder, and submit callback. Optional getter to set initial value.
+- `AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged, Func<float> getter = null)`: Adds a numeric input with increment/decrement buttons. Optional getter to sync with current value.
+- `AddToggle(string label, bool defaultValue, Action<bool> onChanged, Func<bool> getter = null)`: Adds a toggle with label and value changed callback. Optional getter to sync with current value.
 
 ### DebugWrapperBase
 

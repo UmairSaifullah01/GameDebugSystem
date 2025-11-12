@@ -89,7 +89,7 @@ namespace THEBADDEST.GameDebugSystem
 		/// <summary>
 		/// Adds a slider with label and value changed callback.
 		/// </summary>
-		public void AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged)
+		public void AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged, Func<float> getter = null)
 		{
 			var sliderRT = InstantiatePrefab(_activePreset.sliderPrefab, _categoryRoot, $"{_categoryName}_Slider_{label}");
 
@@ -102,7 +102,10 @@ namespace THEBADDEST.GameDebugSystem
 
 			slider.minValue = min;
 			slider.maxValue = max;
-			slider.value = Mathf.Clamp(defaultValue, min, max);
+			
+			// Use getter if provided, otherwise use default value
+			float initialValue = getter != null ? getter() : defaultValue;
+			slider.value = Mathf.Clamp(initialValue, min, max);
 
 			SetLabelText(sliderRT, label);
 
@@ -129,7 +132,7 @@ namespace THEBADDEST.GameDebugSystem
 		/// <summary>
 		/// Adds an input field with label, placeholder, and submit callback.
 		/// </summary>
-		public void AddInputField(string label, string placeholder, Action<string> onSubmit)
+		public void AddInputField(string label, string placeholder, Action<string> onSubmit, Func<string> getter = null)
 		{
 			var inputRT = InstantiatePrefab(_activePreset.inputFieldPrefab, _categoryRoot, $"{_categoryName}_Input_{label}");
 			SetLabelText(inputRT, label);
@@ -142,6 +145,16 @@ namespace THEBADDEST.GameDebugSystem
 			}
 
 			input.lineType = TMP_InputField.LineType.SingleLine;
+
+			// Use getter if provided to set initial value
+			if (getter != null)
+			{
+				var currentValue = getter();
+				if (!string.IsNullOrEmpty(currentValue))
+				{
+					input.text = currentValue;
+				}
+			}
 
 			var placeholderText = input.placeholder as TMP_Text;
 			if (placeholderText != null && !string.IsNullOrEmpty(placeholder))
@@ -165,7 +178,7 @@ namespace THEBADDEST.GameDebugSystem
 		/// Adds a numeric input with optional '<' and '>' buttons to decrement/increment.
 		/// Uses NumberInput prefab exclusively.
 		/// </summary>
-		public void AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged)
+		public void AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged, Func<float> getter = null)
 		{
 			var numberRT = InstantiatePrefab(_activePreset.numberInputFieldPrefab, _categoryRoot, $"{_categoryName}_Number_{label}");
 			SetLabelText(numberRT, label);
@@ -177,7 +190,9 @@ namespace THEBADDEST.GameDebugSystem
 				return;
 			}
 
-			float current = Mathf.Clamp(defaultValue, min, max);
+			// Use getter if provided, otherwise use default value
+			float initialValue = getter != null ? getter() : defaultValue;
+			float current = Mathf.Clamp(initialValue, min, max);
 			Action<TMP_InputField, float, bool> UpdateDisplay = (field, v, notify) =>
 			{
 				var clamped = Mathf.Clamp(v, min, max);
@@ -222,7 +237,7 @@ namespace THEBADDEST.GameDebugSystem
 		/// <summary>
 		/// Adds a toggle with label and value changed callback.
 		/// </summary>
-		public void AddToggle(string label, bool defaultValue, Action<bool> onChanged)
+		public void AddToggle(string label, bool defaultValue, Action<bool> onChanged, Func<bool> getter = null)
 		{
 			var toggleRT = InstantiatePrefab(_activePreset.toggleInputFieldPrefab, _categoryRoot, $"{_categoryName}_Toggle_{label}");
 			SetLabelText(toggleRT, label);
@@ -233,7 +248,9 @@ namespace THEBADDEST.GameDebugSystem
 				Debug.LogError($"[DebugUIBuilder] Toggle prefab is missing a Toggle component for '{label}'.");
 				return;
 			}
-			toggle.isOn = defaultValue;
+			
+			// Use getter if provided, otherwise use default value
+			toggle.isOn = getter != null ? getter() : defaultValue;
 
 			if (onChanged != null)
 			{

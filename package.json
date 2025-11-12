@@ -1,6 +1,6 @@
 {
   "name": "com.thebaddest.debugservice",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Game Debug System",
   "description": "A flexible Unity debug and cheat system that provides a customizable UI builder for creating debug panels with buttons, sliders, input fields, number fields, and toggles. Organize debug controls into categories using ScriptableObject-based wrappers.",
   "unity": "2020.3",
