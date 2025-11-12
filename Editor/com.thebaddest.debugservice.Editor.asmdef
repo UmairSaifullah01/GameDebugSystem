@@ -1,0 +1,18 @@
+{
+    "name": "com.thebaddest.debugservice.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:28552ee7bddf8d145b58ec9abef92e16"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

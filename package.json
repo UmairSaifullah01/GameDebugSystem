@@ -1,20 +1,29 @@
 {
-	"name": "com.thebaddest.debugservice",
-	"version": "1.0.0",
-	"displayName": "DebugService",
-	"description": "A short description of your package.",
-	"unity": "2020.3",
-	"author": {
-		"name": "Umair Saifullah",
-		"email": "contact@umairsaifullah.com",
-		"url": "https://www.umairsaifullah.com"
-	},
-	"documentationUrl": "",
-	"repository": {
-		"url": "",
-		"type": "git",
-		"revision": ""
-	},
-	"dependencies": {}
+  "name": "com.thebaddest.debugservice",
+  "version": "1.0.1",
+  "displayName": "Game Debug System",
+  "description": "A flexible Unity debug and cheat system that provides a customizable UI builder for creating debug panels with buttons, sliders, input fields, number fields, and toggles. Organize debug controls into categories using ScriptableObject-based wrappers.",
+  "unity": "2020.3",
+  "keywords": [
+    "debug",
+    "cheat",
+    "ui",
+    "builder",
+    "testing",
+    "development"
+  ],
+  "author": {
+    "name": "Umair Saifullah",
+    "email": "contact@umairsaifullah.com",
+    "url": "https://www.umairsaifullah.com"
+  },
+  "documentationUrl": "",
+  "repository": {
+    "url": "",
+    "type": "git",
+    "revision": ""
+  },
+  "dependencies": {
+    "com.unity.textmeshpro": "3.0.0"
+  }
 }
-			
