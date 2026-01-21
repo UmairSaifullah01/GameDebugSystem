@@ -48,11 +48,9 @@ namespace THEBADDEST.GameDebugSystem
 		public DebugUIBuilder.UIPreset UIPreset => _uiPreset;
 		public bool IsVisible
 		{
-			get
-			{
-				return _rootTransform != null && _rootTransform.gameObject.activeSelf;
-			}
+			get { return _rootTransform != null && _rootTransform.gameObject.activeSelf; }
 		}
+
 		/// <summary>
 		/// Build or rebuild the cheat UI onto the provided canvas.
 		/// </summary>
@@ -70,7 +68,6 @@ namespace THEBADDEST.GameDebugSystem
 			_cachedCanvas = canvas;
 			DebugUIBuilder.ApplyUIPreset(_uiPreset);
 			_rootTransform = canvas.transform.Find("Root") as RectTransform;
-
 			for (int i = 0; i < _wrappers.Count; i++)
 			{
 				var w = _wrappers[i];
@@ -80,6 +77,7 @@ namespace THEBADDEST.GameDebugSystem
 
 			// Add toggle button if UIButton trigger type is selected
 			CreateToggleButton(canvas);
+			CreateCrossButton(canvas);
 
 			// Categories are created via the builder (which ensures a shared scroll root)
 			foreach (var wrapper in _runtimeWrappers)
@@ -94,7 +92,6 @@ namespace THEBADDEST.GameDebugSystem
 
 			// Ensure canvas is active (needed for toggle button and corner tap detection)
 			EnsureCanvasActive(canvas);
-
 			if (_hideAtStart)
 			{
 				if (_rootTransform != null)
@@ -138,7 +135,7 @@ namespace THEBADDEST.GameDebugSystem
 			ClearBuiltUI();
 			Init();
 		}
-		
+
 		private void SetCanvasVisibility(bool visible)
 		{
 			if (visible)
@@ -208,7 +205,8 @@ namespace THEBADDEST.GameDebugSystem
 				_triggerHandler = null;
 				if (go != null)
 				{
-					if (Application.isPlaying) Destroy(go); else DestroyImmediate(go);
+					if (Application.isPlaying) Destroy(go);
+					else DestroyImmediate(go);
 				}
 			}
 			else
@@ -216,9 +214,11 @@ namespace THEBADDEST.GameDebugSystem
 				var existing = GameObject.Find(CanvasName);
 				if (existing != null)
 				{
-					if (Application.isPlaying) Destroy(existing); else DestroyImmediate(existing);
+					if (Application.isPlaying) Destroy(existing);
+					else DestroyImmediate(existing);
 				}
 			}
+
 			DebugUIBuilder.ResetCache();
 		}
 
@@ -242,12 +242,35 @@ namespace THEBADDEST.GameDebugSystem
 				if (_triggerType == TriggerType.UIButton)
 				{
 					var button = existingButton.GetComponent<Button>();
-					button.onClick.AddListener(ToggleVisibility);
+					button.onClick.AddListener(() =>
+					{
+						existingButton.gameObject.SetActive(false);
+						Show();
+					});
 				}
 				else
 				{
 					existingButton.gameObject.SetActive(false);
 				}
+			}
+		}
+
+		private void CreateCrossButton(Canvas canvas)
+		{
+			// Check if button already exists
+			var existingButton = canvas.transform.Find("Root/CrossButton");
+			if (existingButton != null)
+			{
+				var button = existingButton.GetComponent<Button>();
+				button.onClick.AddListener(() =>
+				{
+					Hide();
+					if (_triggerType == TriggerType.UIButton)
+					{
+						var debugButton = canvas.transform.Find("DebugToggleButton");
+						debugButton?.gameObject?.SetActive(true);
+					}
+				});
 			}
 		}
 
@@ -282,6 +305,7 @@ namespace THEBADDEST.GameDebugSystem
 			{
 				fader = _cachedCanvas.gameObject.AddComponent<DebugCanvasFader>();
 			}
+
 			if (fader != null)
 			{
 				fader.Fade(cg, show, 0.15f);
