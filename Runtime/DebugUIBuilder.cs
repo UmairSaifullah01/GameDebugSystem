@@ -38,9 +38,16 @@ namespace THEBADDEST.GameDebugSystem
 		private static UIPreset _activePreset = UIPreset.CreateDefault();
 		public static UIPreset ActivePreset => _activePreset;
 
+		private static RectTransform _cachedContentRoot;
+
 		public static void ApplyUIPreset(UIPreset preset)
 		{
 			_activePreset = preset;
+		}
+
+		public static void ResetCache()
+		{
+			_cachedContentRoot = null;
 		}
 
 		private readonly RectTransform _categoryRoot;
@@ -261,14 +268,19 @@ namespace THEBADDEST.GameDebugSystem
 		// Helpers
 		private static RectTransform EnsureRootContainer(Canvas canvas)
 		{
-			// Expect a prefab-created hierarchy: Root/ScrollView/Viewport/Content
+			if (_cachedContentRoot != null) return _cachedContentRoot;
 			var root = canvas.transform.Find("Root/ScrollView/Viewport/Content") as RectTransform;
-			if (root != null) return root;
-
-			// Fallback: attempt to use Root directly
+			if (root != null)
+			{
+				_cachedContentRoot = root;
+				return root;
+			}
 			root = canvas.transform.Find("Root") as RectTransform;
-			if (root != null) return root;
-
+			if (root != null)
+			{
+				_cachedContentRoot = root;
+				return root;
+			}
 			Debug.LogError("[DebugUIBuilder] Could not locate the preset Content container. Ensure the canvas prefab contains 'Root/ScrollView/Viewport/Content'.");
 			throw new InvalidOperationException("Missing preset content root.");
 		}
