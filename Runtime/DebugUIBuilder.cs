@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
@@ -17,11 +18,13 @@ namespace THEBADDEST.GameDebugSystem
 		{
 			public GameObject canvasPrefab;
 			public GameObject categoryPrefab;
+			public GameObject rowPrefab;
 			public GameObject buttonPrefab;
 			public GameObject sliderPrefab;
 			public GameObject inputFieldPrefab;
 			public GameObject numberInputFieldPrefab;
 			public GameObject toggleInputFieldPrefab;
+			public GameObject dropdownPrefab;
 
 			public static UIPreset CreateDefault() => new UIPreset
 			{
@@ -32,6 +35,8 @@ namespace THEBADDEST.GameDebugSystem
 				inputFieldPrefab = null,
 				numberInputFieldPrefab = null,
 				toggleInputFieldPrefab = null,
+				dropdownPrefab = null,
+				rowPrefab=null
 			};
 		}
 
@@ -78,7 +83,8 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddButton(string label, Action onClick)
 		{
-			var buttonRT = InstantiatePrefab(_activePreset.buttonPrefab, _categoryRoot, $"{_categoryName}_Button_{label}");
+			var row = GetOrCreateRow();
+			var buttonRT = InstantiatePrefab(_activePreset.buttonPrefab, row, $"{_categoryName}_Button_{label}");
 			var button = buttonRT.GetComponentInChildren<Button>(true);
 			if (button == null)
 			{
@@ -96,9 +102,10 @@ namespace THEBADDEST.GameDebugSystem
 		/// <summary>
 		/// Adds a slider with label and value changed callback.
 		/// </summary>
-		public void AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged, Func<float> getter = null)
+		public void AddSlider(string label, float min, float max, float defaultValue, Action<float> onChanged, Func<float> getter = null, float step = 0f)
 		{
-			var sliderRT = InstantiatePrefab(_activePreset.sliderPrefab, _categoryRoot, $"{_categoryName}_Slider_{label}");
+			var row = GetOrCreateRow();
+			var sliderRT = InstantiatePrefab(_activePreset.sliderPrefab, row, $"{_categoryName}_Slider_{label}");
 
 			var slider = sliderRT.GetComponentInChildren<Slider>(true);
 			if (slider == null)
@@ -122,6 +129,37 @@ namespace THEBADDEST.GameDebugSystem
 				valueText.text = slider.value.ToString("0.##");
 			}
 
+			// Action to update slider value with clamping and notification
+			Action<float> UpdateSliderValue = (newValue) =>
+			{
+				var clamped = Mathf.Clamp(newValue, min, max);
+				slider.SetValueWithoutNotify(clamped);
+				if (valueText != null) valueText.text = clamped.ToString("0.##");
+				if (onChanged != null) onChanged(clamped);
+			};
+
+			// Add increment/decrement buttons if step is provided
+			if (step > 0f)
+			{
+				var buttons = sliderRT.GetComponentsInChildren<Button>(true);
+				if (buttons != null)
+				{
+					foreach (var button in buttons)
+					{
+						if (button == null) continue;
+						var nameLower = button.name.ToLowerInvariant();
+						if (nameLower.Contains("left") || nameLower.Contains("dec") || nameLower.Contains("minus"))
+						{
+							button.onClick.AddListener(() => UpdateSliderValue(slider.value - step));
+						}
+						else if (nameLower.Contains("right") || nameLower.Contains("inc") || nameLower.Contains("plus"))
+						{
+							button.onClick.AddListener(() => UpdateSliderValue(slider.value + step));
+						}
+					}
+				}
+			}
+
 			if (onChanged != null)
 			{
 				slider.onValueChanged.AddListener(v =>
@@ -141,7 +179,8 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddInputField(string label, string placeholder, Action<string> onSubmit, Func<string> getter = null)
 		{
-			var inputRT = InstantiatePrefab(_activePreset.inputFieldPrefab, _categoryRoot, $"{_categoryName}_Input_{label}");
+			var row = GetOrCreateRow();
+			var inputRT = InstantiatePrefab(_activePreset.inputFieldPrefab, row, $"{_categoryName}_Input_{label}");
 			SetLabelText(inputRT, label);
 
 			var input = inputRT.GetComponentInChildren<TMP_InputField>(true);
@@ -187,7 +226,8 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddNumberField(string label, float min, float max, float step, float defaultValue, Action<float> onChanged, Func<float> getter = null)
 		{
-			var numberRT = InstantiatePrefab(_activePreset.numberInputFieldPrefab, _categoryRoot, $"{_categoryName}_Number_{label}");
+			var row = GetOrCreateRow();
+			var numberRT = InstantiatePrefab(_activePreset.numberInputFieldPrefab, row, $"{_categoryName}_Number_{label}");
 			SetLabelText(numberRT, label);
 
 			var input = numberRT.GetComponentInChildren<TMP_InputField>(true);
@@ -246,7 +286,8 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddToggle(string label, bool defaultValue, Action<bool> onChanged, Func<bool> getter = null)
 		{
-			var toggleRT = InstantiatePrefab(_activePreset.toggleInputFieldPrefab, _categoryRoot, $"{_categoryName}_Toggle_{label}");
+			var row = GetOrCreateRow();
+			var toggleRT = InstantiatePrefab(_activePreset.toggleInputFieldPrefab, row, $"{_categoryName}_Toggle_{label}");
 			SetLabelText(toggleRT, label);
 
 			var toggle = toggleRT.GetComponentInChildren<Toggle>(true);
@@ -265,7 +306,107 @@ namespace THEBADDEST.GameDebugSystem
 			}
 		}
 
+		/// <summary>
+		/// Adds a dropdown with label, options, and value changed callback.
+		/// </summary>
+		public void AddDropdown(string label, IEnumerable<string> options, int defaultIndex, Action<int> onChanged, Func<int> getter = null)
+		{
+			var row = GetOrCreateRow();
+			var dropdownRT = InstantiatePrefab(_activePreset.dropdownPrefab, row, $"{_categoryName}_Dropdown_{label}");
+
+			var dropdown = dropdownRT.GetComponentInChildren<TMP_Dropdown>(true);
+			if (dropdown == null)
+			{
+				Debug.LogError($"[DebugUIBuilder] Dropdown prefab is missing a TMP_Dropdown component for '{label}'.");
+				return;
+			}
+
+			SetLabelText(dropdownRT, label);
+
+			// Clear existing options and add new ones
+			dropdown.ClearOptions();
+			var optionsList = options?.ToList() ?? new List<string>();
+			if (optionsList.Count == 0)
+			{
+				Debug.LogWarning($"[DebugUIBuilder] Dropdown '{label}' has no options provided.");
+				return;
+			}
+			dropdown.AddOptions(optionsList);
+
+			// Use getter if provided, otherwise use default index
+			int initialIndex = getter != null ? getter() : defaultIndex;
+			int clampedIndex = Mathf.Clamp(initialIndex, 0, optionsList.Count - 1);
+			dropdown.SetValueWithoutNotify(clampedIndex);
+
+			if (onChanged != null)
+			{
+				dropdown.onValueChanged.AddListener(onChanged.Invoke);
+			}
+		}
+
 		// Helpers
+		/// <summary>
+		/// Gets or creates a row that has space for a new element (max 2 elements per row).
+		/// Each category manages its own rows independently, so multiple categories work correctly.
+		/// Rows are added after the Header element in the category prefab.
+		/// </summary>
+		private RectTransform GetOrCreateRow()
+		{
+			// Find the Header element (if it exists) to know where rows start
+			Transform headerTransform = null;
+			int headerIndex = -1;
+			int childCount = _categoryRoot.childCount;
+			
+			for (int i = 0; i < childCount; i++)
+			{
+				var child = _categoryRoot.GetChild(i);
+				var nameLower = child.name.ToLowerInvariant();
+				if (nameLower.Contains("header"))
+				{
+					headerTransform = child;
+					headerIndex = i;
+					break;
+				}
+			}
+			
+			// Check if there's an existing row with less than 2 children
+			// Look from the end backwards to find the last row (skip Header)
+			if (childCount > 0)
+			{
+				// Check the last child (which should be a row, not the Header)
+				var lastChild = _categoryRoot.GetChild(childCount - 1);
+				var lastRowRT = lastChild as RectTransform;
+				
+				// Verify it's not the Header and check if it's a row with space
+				if (lastRowRT != null && lastRowRT != headerTransform && lastRowRT.childCount < 2)
+				{
+					return lastRowRT;
+				}
+			}
+			
+			// No available row found, create a new one for this category
+			// Count only rows (excluding Header) for naming
+			int rowCount = headerIndex >= 0 ? childCount - 1 : childCount;
+			var newRow = InstantiatePrefab(_activePreset.rowPrefab, _categoryRoot, $"{_categoryName}_Row_{rowCount}");
+			
+			// Ensure the row is positioned after the Header
+			// InstantiatePrefab adds at the end, which is correct if Header is at the beginning
+			// If Header is somehow not at the beginning, ensure row is after it
+			if (headerIndex >= 0 && headerIndex > 0)
+			{
+				// Header is not at the beginning, ensure row is after Header
+				// After instantiation, childCount has increased, so we need to account for that
+				int targetIndex = headerIndex + 1;
+				if (newRow.GetSiblingIndex() < targetIndex)
+				{
+					newRow.SetSiblingIndex(targetIndex);
+				}
+			}
+			// Otherwise, Header is at index 0 or doesn't exist, and new row is at the end (correct)
+			
+			return newRow;
+		}
+
 		private static RectTransform EnsureRootContainer(Canvas canvas)
 		{
 			if (_cachedContentRoot != null) return _cachedContentRoot;
