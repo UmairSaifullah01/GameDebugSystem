@@ -239,6 +239,7 @@ namespace THEBADDEST.GameDebugSystem
 			var existingButton = canvas.transform.Find("DebugToggleButton");
 			if (existingButton != null)
 			{
+				DebugUIBuilder.toggleButton = existingButton;
 				if (_triggerType == TriggerType.UIButton)
 				{
 					var button = existingButton.GetComponent<Button>();
