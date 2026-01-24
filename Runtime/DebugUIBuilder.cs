@@ -44,7 +44,7 @@ namespace THEBADDEST.GameDebugSystem
 		public static UIPreset ActivePreset => _activePreset;
 
 		private static RectTransform _cachedContentRoot;
-
+		
 		public static void ApplyUIPreset(UIPreset preset)
 		{
 			_activePreset = preset;
@@ -57,11 +57,13 @@ namespace THEBADDEST.GameDebugSystem
 
 		private readonly RectTransform _categoryRoot;
 		private readonly string _categoryName;
-
+		private RectTransform _currentRow; // Track current row to support EndRow()
+		public static Transform toggleButton;
 		private DebugUIBuilder(string categoryName, RectTransform categoryRoot)
 		{
 			_categoryName = categoryName;
 			_categoryRoot = categoryRoot;
+			_currentRow = null;
 		}
 
 		/// <summary>
@@ -83,9 +85,20 @@ namespace THEBADDEST.GameDebugSystem
 		/// </summary>
 		public void AddButton(string label, Action onClick)
 		{
+			AddButton(label, onClick, out _);
+		}
+
+		/// <summary>
+		/// Adds a button with a label and click callback, returning the button instance for further modification.
+		/// </summary>
+		/// <param name="label">Button label text</param>
+		/// <param name="onClick">Click callback action</param>
+		/// <param name="button">Output parameter for the created button instance</param>
+		public void AddButton(string label, Action onClick, out Button button)
+		{
 			var row = GetOrCreateRow();
 			var buttonRT = InstantiatePrefab(_activePreset.buttonPrefab, row, $"{_categoryName}_Button_{label}");
-			var button = buttonRT.GetComponentInChildren<Button>(true);
+			button = buttonRT.GetComponentInChildren<Button>(true);
 			if (button == null)
 			{
 				Debug.LogError($"[DebugUIBuilder] Button prefab is missing a Button component for '{label}'.");
@@ -344,6 +357,14 @@ namespace THEBADDEST.GameDebugSystem
 			}
 		}
 
+		/// <summary>
+		/// Ends the current row, forcing the next element to be added to a new row.
+		/// </summary>
+		public void EndRow()
+		{
+			_currentRow = null;
+		}
+
 		// Helpers
 		/// <summary>
 		/// Gets or creates a row that has space for a new element (max 2 elements per row).
@@ -351,6 +372,29 @@ namespace THEBADDEST.GameDebugSystem
 		/// Rows are added after the Header element in the category prefab.
 		/// </summary>
 		private RectTransform GetOrCreateRow()
+		{
+			// If EndRow() was called, force a new row
+			if (_currentRow == null)
+			{
+				_currentRow = CreateNewRow();
+				return _currentRow;
+			}
+			
+			// Check if current row has space
+			if (_currentRow.childCount < 2)
+			{
+				return _currentRow;
+			}
+			
+			// Current row is full, create a new one
+			_currentRow = CreateNewRow();
+			return _currentRow;
+		}
+
+		/// <summary>
+		/// Creates a new row after the Header element.
+		/// </summary>
+		private RectTransform CreateNewRow()
 		{
 			// Find the Header element (if it exists) to know where rows start
 			Transform headerTransform = null;
@@ -369,22 +413,6 @@ namespace THEBADDEST.GameDebugSystem
 				}
 			}
 			
-			// Check if there's an existing row with less than 2 children
-			// Look from the end backwards to find the last row (skip Header)
-			if (childCount > 0)
-			{
-				// Check the last child (which should be a row, not the Header)
-				var lastChild = _categoryRoot.GetChild(childCount - 1);
-				var lastRowRT = lastChild as RectTransform;
-				
-				// Verify it's not the Header and check if it's a row with space
-				if (lastRowRT != null && lastRowRT != headerTransform && lastRowRT.childCount < 2)
-				{
-					return lastRowRT;
-				}
-			}
-			
-			// No available row found, create a new one for this category
 			// Count only rows (excluding Header) for naming
 			int rowCount = headerIndex >= 0 ? childCount - 1 : childCount;
 			var newRow = InstantiatePrefab(_activePreset.rowPrefab, _categoryRoot, $"{_categoryName}_Row_{rowCount}");
@@ -460,6 +488,42 @@ namespace THEBADDEST.GameDebugSystem
 			if (root == null) return null;
 			var texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
 			return texts.FirstOrDefault(t => t.name.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0);
+		}
+
+		/// <summary>
+		/// Changes the transparency (alpha) of a button's colors.
+		/// Updates normal, highlighted, pressed, and selected colors.
+		/// </summary>
+		/// <param name="button">The button to modify</param>
+		/// <param name="alpha">Alpha value between 0 (transparent) and 1 (opaque)</param>
+		public static void SetButtonTransparency(Button button, float alpha)
+		{
+			if (button == null)
+			{
+				Debug.LogError("[DebugUIBuilder] Button is null, cannot change transparency.");
+				return;
+			}
+
+			alpha = Mathf.Clamp01(alpha);
+			var colors = button.colors;
+			
+			// Update all color states with new alpha
+			colors.normalColor = new Color(colors.normalColor.r, colors.normalColor.g, colors.normalColor.b, alpha);
+			colors.highlightedColor = new Color(colors.highlightedColor.r, colors.highlightedColor.g, colors.highlightedColor.b, alpha);
+			colors.pressedColor = new Color(colors.pressedColor.r, colors.pressedColor.g, colors.pressedColor.b, alpha);
+			colors.selectedColor = new Color(colors.selectedColor.r, colors.selectedColor.g, colors.selectedColor.b, alpha);
+			colors.disabledColor = new Color(colors.disabledColor.r, colors.disabledColor.g, colors.disabledColor.b, alpha);
+			
+			button.colors = colors;
+
+			// Also update the Image component's alpha if it exists
+			var image = button.GetComponent<Image>();
+			if (image != null)
+			{
+				var imageColor = image.color;
+				imageColor.a = alpha;
+				image.color = imageColor;
+			}
 		}
 	}
 }
